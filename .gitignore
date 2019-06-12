@@ -20,3 +20,5 @@ results/blum_allClines\.Rdata
 results/mallet_allClines\.Rdata
 
 results/thurman_allClines\.Rdata
+
+*.tif

@@ -6,17 +6,7 @@
 rm(list=ls())
 library(tidyverse)
 library(rethinking)
-library(rgdal)
 library(raster)
-library(rgeos)
-library(sp)
-library(sf)
-library(bayesplot)
-library(rstan)
-library(stringr)
-library(assertthat)
-library(ggrepel)
-source("src/functions.R")
 source("src/hzar_functions.R")
 
 
@@ -65,11 +55,6 @@ sites_gen<- SpatialPoints(cbind(gen$tran.Coord.W, gen$tran.Coord.N),
 # Tested various radii, all were highly correlated.
 # Chose 5k in the end, a scale that works well given our 
 # distances between generated sites. 
-# Actual plots
-joint$ndvi2000 <- raster::extract(ndvi2000, sites_actual, method = "simple", fun = mean, buffer = 5000, na.rm = T)
-joint$ndvi2017 <- raster::extract(ndvi2017, sites_actual, method = "simple", fun = mean, buffer = 5000, na.rm = T)
-joint$dNDVI <- raster::extract(dNDVI, sites_actual, method = "simple", fun = mean, buffer = 5000, na.rm = T)
-# Generated sites
 gen$ndvi2000 <- raster::extract(ndvi2000, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
 gen$ndvi2017  <- raster::extract(ndvi2017, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
 gen$dNDVI<- raster::extract(dNDVI, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
@@ -99,30 +84,19 @@ gen$exp.p.thurm <- right.eqn.vec(transectDist = gen$transect.dist,
                                  center = 450.89, width = 93.18, 
                                  pmin = 0.04, pmax = 0.94, 
                                  deltaR = 24.81, tauR = 0.66)
-gen$exp.delta.p <- gen$exp.p.thurm - gen$exp.p.blum
+gen$exp.delta.p <- gen$exp.p.thurm - gen$exp.p.blum 
 
 
 
 
 # Analysis ----------------------------------------------------------------
 
-# Look at correlation between change in NDVI and change in allele frequency
-plot(gen$dNDVI, gen$exp.delta.p)
-cor.test(gen$dNDVI, -1*gen$exp.delta.p, method = "spearman")
-# There is none.
-
-# Could look at the correlation between
+# Correlation between
 # the proportion of forest loss
 # and the expected change in allele frequency
-plot(gen$propLost, gen$exp.delta.p)
 cor.test(gen$propLost, gen$exp.delta.p, method = "spearman")
-# Here, there's a correlation, but it is negative!
-# The opposite of what we'd expect. That is, we'd expect loss of forest
-# to lead in increase in the hydara allele. Instead, the correlation is negative,
-# with areas experiencing the biggest loss showing relatively little change. 
 
 
-# Is there a correlation between percent of forest loss and dNDVI?
-cor.test(gen$dNDVI, gen$propLost, method = "spearman")  #no
-
-
+# Correlation between change in NDVI and change in allele frequency
+cor.test(gen$dNDVI, gen$exp.delta.p, method = "spearman")
+# There is none.
