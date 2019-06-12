@@ -1,0 +1,734 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: header.tex
+    keep_tex: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+# Set knitr options
+## NOTE: in Rstudio, set Knit directory as the project directory, not as the 
+# document directory. Otherwise, the manuscript won't knit. 
+knitr::opts_chunk$set(echo = F, warning = F, message = F, fig.align = "center", cache = T)
+# load packages
+library(tidyverse)
+library(broom)
+library(coda)
+library(kableExtra)
+library(rethinking)
+library(raster)
+library(bayesplot)
+library(lemon)
+library(cowplot)
+```
+
+```{r source_functions, echo=FALSE, message=F, warning=F}
+source("src/functions.R")
+```
+
+```{r, loadRstanResults}
+# Load in best-fit models -------------------------------------------------
+# Mallet
+load("results/mallet_bestCline.Rdata")
+mallet <- none
+rm(none)
+
+# Blum
+load("results/blum_bestCline.Rdata")
+blum <- right
+rm(right)
+
+# Thurman
+load("results/thurman_bestCline.Rdata")
+thurman <- right
+rm(right)
+
+
+# Load in Joint transect --------------------------------------------------
+joint <- read.csv("processed_data/joint_transect.csv") %>% 
+  mutate(AA = A.melanized, 
+         Aa = B.hetero, 
+         aa = C.west.col + D.postman,
+         N = A.melanized + B.hetero + C.west.col + D.postman)
+
+data.mallet <- joint %>% 
+  filter(year == "1982")
+
+data.blum <- joint %>% 
+  filter(year == "1999")
+
+data.thurman <- joint %>% 
+  filter(year == "2015")
+
+```
+
+```{r, loadSimulationResults}
+load("results/corr_simulation_res.Rdata")
+load("results/bayes_simulation_res.Rdata")
+
+full <- rbind(bayes_results, corr) %>% 
+  arrange(model, data_set)
+rm(bayes_results, corr)
+
+simtime <- full %>% 
+  group_by(model) %>% 
+  summarise(mean.time = mean(time/60))
+
+RMSD_by_parameter_set <- full %>% 
+  mutate(difference = estimate - sim_val,
+         sq.diff = (estimate - sim_val)^2) %>% 
+  group_by(parameter, param_set, model) %>% 
+  summarise(RMSD = sqrt(mean(sq.diff))) %>% 
+  ungroup()
+
+# And then do a t.test
+pair.t.test <- RMSD_by_parameter_set %>% 
+  spread(model, RMSD) %>% 
+  group_by(parameter) %>% 
+  do(tidy(t.test(.$bayes, .$corr.HZAR, paired = T))) %>% 
+  ungroup() %>% 
+  rename(df = parameter) %>% 
+  mutate(parameter = c("center", "pmax", "pmin", "width"), 
+         param_set = 0,
+         compare = "average")
+
+perr_correct_by_model <- full %>%
+  mutate(greater.low = sim_val > low_est,
+         less.high = sim_val < up_est) %>%
+  mutate(within = (greater.low + less.high == 2)) %>%
+  group_by(model) %>%
+  summarize(correct = sum(within),
+            total = length(within)) %>%
+  ungroup() %>%
+  mutate(perc.corr = correct/total)
+
+```
+
+
+
+\subsection{Supplemental material for:}
+
+# Movement of a \textit{Heliconius} hybrid zone over 30 years: a Bayesian approach
+
+## Supplemental Methods
+
+### Details on collection data
+
+For Mallet's collections, we used the locality and phenotype data presented in Table 4 of \citet{Mallet:1986vj}. Mallet sampled 20 sites across Panama, but some of these sites were not on the main transect he used to estimate cline parameters. We included `r dim(data.mallet)[1]` of Mallet's sites in our analysis. We excluded 5 sites (which Mallet also excluded) for being on the coast and too far from the main transect, on islands off the mainland, or too far east. However, we included two sites (Río Iglesias and Madden Dam) that Mallet excluded from his cline estimates.
+
+For Blum's collections, we extracted locality and phenotype data from Table 1 of \citet{Blum:2002wr}. Blum collected at 24 sites, but did not include all sites in his calculation of the cline. We included `r dim(data.blum)[1]` sites in our analysis, excluding 2 sites (which Blum also excluded) for being on islands off the mainland. We included two sites (Pipeline Road and Madden Dam) that Blum excluded from his cline estimates. Blum did not use all four phenotypic categories, only \textit{H. e. hydara}, \textit{H. e. demophoon}, and heterozygotes. 
+
+\textbf{N.B.}- the taxonomy of \textit{H. erato} has changed since the publication of these earlier papers. \textit{H. erato demophoon} in Panamá was previously considered \textit{H. erato petiverana}, and goes by that older name in \citet{Mallet:1986vj} and \citet{Blum:2002wr}. 
+
+For the 2015 collections, at some sites we collected at multiple subsites to achieve sufficient sample sizes. Before fitting clines, we tested for genetic differentiation between subsites at the same site using Fisher's exact tests on allele counts (pooling the \textit{Cr\textsubscript{WC}} and \textit{Cr\textsubscript{CA}} alleles). We found no evidence of differentiation (all $P$ > 0.05, results not shown), and thus combined subsites, using the GPS coordinates of the subsite with the most samples or randomly selected a subsite if sampling was equal. 
+
+### Phenotyping, genotyping, and estimation of allele frequencies
+
+In Panamá there are three alleles at the \textit{Cr} locus, which we  designate: (1) \textit{Cr\textsubscript{HYD}}, the dominant, black-hindwing allele found in \textit{H. e. hydara}; (2) \textit{Cr\textsubscript{WC}}, the recessive, ventral-only yellow allele found in the west Colombian \textit{H. e. venus}; and (3) \textit{Cr\textsubscript{CA}}, the recessive, yellow allele found in the Central American \textit{H. e. demophoon}. The dominance relationship is: \textit{Cr\textsubscript{HYD}} is dominant to \textit{Cr\textsubscript{WC}} which is dominant to \textit{Cr\textsubscript{CA}} \citep{Mallet:1986vj}. Given this dominance relationship, we can assign genotypes to the four phenotypic classifications:
+
+\begin{itemize}
+
+\item[] (A) the north Colombian race, \textit{H. e. hydara}, with fully black hindwings, is homozygous for \textit{Cr\textsubscript{HYD}}.
+
+\item[] (B) Heterozygotes, with black hindwings that display a faint yellow bar on the ventral side, could be either \textit{Cr\textsubscript{HYD}}/\textit{Cr\textsubscript{CA}} or \textit{Cr\textsubscript{HYD}}/\textit{Cr\textsubscript{WC}}. These genotypes cannot be distinguished visually. 
+
+
+\item[] (C) the west Colombian race, \textit{H. e. venus}, with the yellow hindwing band present only on the ventral side, could be either \textit{Cr\textsubscript{WC}}/\textit{Cr\textsubscript{CA}} or \textit{Cr\textsubscript{WC}}/\textit{Cr\textsubscript{WC}}. These genotypes cannot be distinguished visually.
+
+
+\item[] (D) the Central American race, \textit{H. e. demophoon}, with the yellow hindwing band on the dorsal and ventral sides, is homozygous for \textit{Cr\textsubscript{CA}}.
+
+\end{itemize}
+
+Given these phenotype possibilities, the frequency of the \textit{Cr\textsubscript{HYD}} allele can be directly observed as:
+
+\begin{equation}
+f(Cr_{HYD}) = \frac{2A + B}{A + B + C +D}
+\end{equation}
+
+The combined frequency of the yellow alleles, $f(Cr_{yel})$, is simply $1 - f(Cr_{hyd})$. However, determining which yellow allele(s) are present in a population and calculating their frequencies is less straightforward. For populations where $f(Cr_{yel}) > 0$, there are 4 possible situations. When neither yellow homozygote is present in the populations, we assume that any heterozygotes have the $Cr_{CA}$ allele, as this is more common in our study populations. 
+
+In populations with both types of yellow allele (e.g., with both type C and type D individuals), the frequencies of the individual yellow alleles cannot be directly observed. The appendix of Mallet (1986) presents a maximum likelihood method for partitioning $f(Cr_{yel})$ into $f(Cr_{CA})$ and $f(Cr_{WC})$. Assuming the locus is at Hardy-Weinberg equilibrium, the ratio between $f(Cr_{CA})$ and $f(Cr_{WC})$ can be calculated as:
+
+\begin{equation}
+\frac{f(Cr_{CA})}{f(Cr_{WC})}  =  \frac{f_{D}+f_{D}(f_{C}+f_{D})}{f_{C}}
+\end{equation}
+
+where $f(x)$ is the frequency of allele $x$ and $f_{X}$ is the frequency of phenotype $X$. Allele frequencies must add up to one such that
+
+\begin{equation}
+f(Cr_{HYD}) + f(Cr_{WC}) + f(Cr_{CA}) = 1
+\end{equation}
+
+We can solve equation 2 for $f(Cr_{WC})$:
+
+\begin{equation}
+f(Cr_{WC}) = \frac{f(Cr_{CA})f_{C}}{f_{D}+f_{D}(f_{C}+f_{D})}
+\end{equation}
+
+We can then substitue this result into equation 3 and do some algebra  to derive an equation for the frequency of the central American allele:
+
+\begin{equation}
+f(Cr_{CA}) = \frac{[f_{D}+f_{D}(f_{C}+f_{D})](1-f(Cr_{HYD}))}{f_{C} + f_{D}+f_{D}f_{C}+f_{D}^{2}}
+\end{equation}
+
+Using this equation, we can calculate allele frequencies for all three alleles. Blum (2002) did not distinguish between West Columbian alleles and central American alleles. But, applying this method to the collections data from Mallet (1986) and this paper, we find that the west Colombian \textit{Cr\textsubscript{WC}} allele is rare in our study (tables S3 and S4). Thus, for this study we focus on the dominant \textit{Cr\textsubscript{HYD}} allele, which can be directly observed, and pool the rare \textit{Cr\textsubscript{WC}} yellow allele with the more common \textit{Cr\textsubscript{CA}} yellow allele, as they cannot be visually distinguished in heterozygotes.
+
+### Assembling transect
+
+To calculate the one-dimensional distance along the transect, we calculated the arclength of the cubic transect accounting for both the curvature of the transect and the curvature of the earth. To calculate the distance between $a$ and $b$, we evaluate:
+
+\begin{equation}
+\label{eq:dist}
+R\frac{\pi}{180}\int_{a}^{b}\sqrt{\left(\cos\frac{f(x)\pi}{180}\right)^2+
+f'(x)^2}\,dx
+\end{equation}
+
+where $R$ is the radius of the earth at the equator, in km, $a$ and $b$ are longitudes for the two sites, and $f(x)$ is the equation describing the cubic transect. For our calculations, we used $R = 6378.137$.
+
+### Cline model equations
+
+There are a number of parameterizations for cline introgression tails, with slightly differing equations. We use the parameterization from \citet{Gay:2008jp}, though our equations are modified to work with clines of increasing allele frequency. We use three equations: one to describe the left tail, one to describe the cline center, and one to describe the right tail. For each model, we include introgression tails as necessary, otherwise the equation for cline center is used to describe the cline. For the mirrored tail model the parameters for the left and right tails are equal, such that $\delta_{L} = \delta_{R} = \delta_{M}$ and $\tau_{L} = \tau_{R} = \tau_{M}$. The equations are:
+
+Equation for left tail, (when $x_{i} \leq c - \delta_{L}$):
+\begin{equation}
+\label{eq:lefttail}
+p_{i} =  p_{min} + (p_{max} - p_{min})\frac{1}{1 + e^{{4\frac{\delta_{L}}{w}}}}\exp{\frac{4\tau_{L}(x_{i}-c+\delta_{L})/w}{1 + e^{\frac{-4\delta_{L}}{w}}}}
+\end{equation}
+
+Equation for center (when $c - \delta_{L} < x_{i} <  c + \delta_{R}$):
+
+\begin{equation}
+\label{eq:clineCenter}
+p_{i} = p_{min} + (p_{max} - p_{min})\frac{e^{4\frac{(x_{i}-c)}{w}}}{1 + e^{4\frac{(x_{i}-c)}{w}}}
+\end{equation}
+
+
+Equation for right tail (when $x_{i} \geq c + \delta_{R}$):
+\begin{equation}
+\label{eq:righttail}
+p_{i} =  p_{min} + (p_{max} - p_{min})\left(1-\frac{1}{1 + e^{{4\frac{\delta_{R}}{w}}}}\exp{\frac{-4\tau_{R}(x_{i}-c-\delta_{R})/w}{1 + e^{\frac{-4\delta_{R}}{w}}}}\right) 
+\end{equation}
+
+### Simulated data and model validation
+
+To test our model, we simulated genotypic data from clines and compared our model estimates to the simulated parameters. For each simulated collection site, we used the cline equation without introgression tails (equation 3 in the main text, equation 8 above) to calculate the expected allele frequency, $p$, at that site. Then, following equation 2 from the main text, we calculated predicted genotype frequencies given the allele frequency, $p$, and the simulated level of inbreeding, $F_{IS}$. From these genotype frequencies, we simulated genotypes of diploid individuals by drawing from the multinomial distribution of genotype frequencies, following equation 1 from the main text. Each simulated dataset consisted of 41 collection sites spread at 10km intervals from 0 to 400km along a transect, with 40 individuals collected at each site.
+
+We simulated datasets under a variety of parameters. We held the center of the cline constant at 200km while varying the other parameters: cline width of 20km and 80km, $p_{min}$ of 0.04 and 0.15, $p_{max}$ of 0.85 and 0.97, and $F_{IS}$ of 0, 0.1, 0.25, 0.5, 0.75, and 1. There were thus 48 different possible parameter combinations. For each parameter combination we simulated 15 datasets, for a total of 720 simulated datasets. 
+
+For each simulated dataset, we fit the cline models two ways: (1) using our novel Bayesian model, (2) using a maximum likelihood approach in the \texttt{R} package \texttt{HZAR} \citep{Derryberry:2014jw} and applying the effective sample size correction of \citet{Alexandrino:2005vl}. We refer to these approaches as (1) Bayesian and (2) corrected ML. 
+
+For the Bayesian approach, we fit the cline model without introgression tails in \texttt{Stan} v2.17.0 and \texttt{RStan} v2.17.3 \citep{Carpenter:2017ke, Anonymous:tt}. We placed weak normal priors on the center $N(350, 100)$ and width $N(50, 100)$, both constrained to be positive. For $p_{min}$ and $p_{max}$, we used uniform priors of $U(0,0.2)$ and $U(0.8,1)$, respectively. We fit four independent chains with 3000 iterations of warm-up and 7000 iterations of sampling, for a total of 28000 samples from the posterior distribution. Chains were run in parallel across 4 processor cores. We generated point estimates and credible intervals for each parameter using the mean and 95% highest posterior density interval (HPDI) of the marginal posterior distribution of each parameter. 
+
+For the corrected ML approach, we fit models in \texttt{HZAR} following the example code given in appendix 1 of \citealt{Derryberry:2014jw}, but removing unnecessary visualization steps to speed model fitting. We fit only the model without introgression tails ("free.none"). We used default settings for all functions and ran chains in parallel. However, we modified the initialization values for all parameters. The models would often fail to fit using the default initialization values, so instead we drew random starting values for each parameter from the same distributions we used to initialize our Bayesian models: for center, a normal distribution with mean equal to the simulated value and a standard deviation of 20; for width, a normal distribution with mean equal to the simulated value and a standard deviation of 15; and for $p_{min}$ and $p_{max}$ uniform distributions of $U(0,0.2)$ and $U(0.8,1)$, respectively. For each parameter, we used the ML value as the point estimate and the lower and upper two-unit log-likelihood limits as the lower and upper confidence intervals \citep{Derryberry:2014jw}. 
+
+We used the \texttt{R} package \texttt{tictoc} to time each individual instance of model fitting and compare across methods \citep{tictoc:tt}. All model fitting was done on a Mac Pro with a 3-Ghz, 8 core Intel Xeon processor with 64 GB of RAM. The average time to fit a model using our Bayesian approach was `r as.integer(simtime[1,2]*60)` seconds, while the average runtime for the corrected ML approach was `r round(simtime[2,2], digits = 2)` minutes.
+
+To compare model accuracy, we calculated the root-mean-square deviation (RMSD) between the estimated parameter values from our models and the simulated values for each of the 48 combinations of parameters. RMSD is a measure of accuracy, with lower values indicating a more accurate model (i.e., smaller average squared differences between the estimated parameter value and the simulated parameter value). For each of the 48 parameter combinations, we calculated the RMSD of each model and for each cline parameter (RMSD is scale-dependent and cannot be compared across parameters). 
+
+We used paired t-tests to examine whether the average RMSD across parameter combinations differed between our Bayesian approach and the corrected ML approach. Our Bayesian approach had a significantly smaller average RMSD (was more accurate) than the corrected ML approach for the center and width parameters (Table S2). However, these differences in accuracy were relatively small. For the $p_{min}$ and $p_{max}$ parameters the difference in average RMSD between the models was not statistically different from 0 (Table S2). 
+
+As another measure of model accuracy, we also calculated how often the "true" simulated value of a parameter was included within the confidence intervals estimated by the model. For our Bayesian method, the true simulated value fell within the 95% credible intervals `r round(perr_correct_by_model[1,4]*100, digits = 2)`% of the time. This is a slight improvement over the ML model (`r round(perr_correct_by_model[2,4]*100, digits = 2)`%), and indicates that our method better models uncertainty around parameter estimates.
+
+### Forest data
+
+We extracted forest data for Panamá from  v1.5 of the Global Forest Change dataset of \citealt{Hansen:2013iy}, found at \url{https://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.5.html}. We downloaded six files:
+
+Filename | Year | Data 
+-----|-----|-----
+Hansen_GFC-2017-v1.5_first_10N_080W.tif |  2000 | Landsat multispectral
+Hansen_GFC-2017-v1.5_first_10N_090W.tif | 2000 | Landsat multispectral
+Hansen_GFC-2017-v1.5_last_10N_080W.tif | 2017 | Landsat multispectral
+Hansen_GFC-2017-v1.5_last_10N_090W.tif | 2017 | Landsat multispectral
+Hansen_GFC-2017-v1.5_lossyear_10N_080W.tif | 2000-2017 | forest loss
+Hansen_GFC-2017-v1.5_lossyear_10N_090W.tif | 2000-2017 | forest loss
+
+For each dataset, we used \texttt{QGIS} \citep{Anonymous:qg} to merge the files for east Panamá (80W) and west Panamá (90W) together, and to crop the images down to include only Panamá. 
+
+The \citealt{Hansen:2013iy} forest loss images encode the data for each pixel as either 0 (no forest loss, where loss is "defined as a stand-replacement disturbance") or a number from 1-17, representing the year of major forest loss. Thus, to determine the proportion of forest lost within a given area, we calculated 1-(number of pixels with value of 0/total number of pixels). We made those calculations using the \texttt{raster} package in \texttt{R} \citep{raster:rp}.
+
+The \citealt{Hansen:2013iy} Landsat multispectral images contain data from four bands, with 8-bit, normalized top-of-atmosphere reflectance values for each band ($\rho$). For NDVI calculation, we used band 3 (red) and band 4 (near infrared, NIR) to calculate NDVI as: 
+
+\begin{equation}
+\label{eq:ndvi}
+NDVI = \frac{\rho_{NIR}-\rho_{red}}{\rho_{NIR}+\rho_{red}}
+\end{equation}
+
+We calculated NDVI separately for each year (2000 and 2017), using the raster calculator in \texttt{QGIS} \citep{Anonymous:qg} to calculate NDVI and $\Delta$NDVI from 2000 to 2017 (i.e., $\Delta$NDVI = NDVI$_{2017}$ - NDVI$_{2000}$). To find the mean NDVI or mean $\Delta$NDVI within a given area, we used the \texttt{raster} package in \texttt{R} \citep{raster:rp}.
+
+\bibliography{hz}
+
+\pagebreak
+
+## Supplemental tables and figures
+
+###Table S1- Butterflies collected in 2015
+
+```{r butterflies_2015}
+read.csv("processed_data/joint_transect.csv") %>% 
+  filter(year == "2015") %>% 
+  mutate(total = A.melanized + B.hetero + C.west.col + D.postman) %>% 
+  dplyr::select(-tran.Coord.N, -tran.Coord.W, -dist.to.last, -transect.dist, -year) %>% 
+  kable(., booktabs = T) %>% 
+  kable_styling(position = "center") 
+```
+
+\textbf{Table S1}- Site names, GPS coordinates (in decimal degrees), and number of samples from each phenotypic class (as defined by \citealt{Mallet:1986vj}, see supplemental methods).
+
+\pagebreak
+
+###Table S2- Comparison of model accuracy
+
+```{r t_test_table, echo = F}
+pair.t.test %>% 
+  dplyr::select(parameter, `difference in RMSD` = estimate,
+         `T statistic` = statistic, `Degrees of freedom` = df, `P` = p.value) %>% 
+  arrange(P) %>% 
+  kable(., booktabs = T, digits = 3) %>% 
+  kable_styling(position = "center")
+```
+
+\textbf{Tables S2}- Results of paired \textit{t}-tests comparing the RMSD for each model. When difference in RMSD is negative the Bayesian model has a smaller RMSD (is more accurate).
+
+\pagebreak 
+
+###Table S3- Frequencies for all three alleles, Mallet (1986) Collections
+
+``` {r load_triallele_table, echo = F}
+tri <- read.csv(file = "results/triallelic_freqs.csv") %>%
+  arrange(transect.dist) %>% 
+  dplyr::select(Year = year, Site = site.collected, f.HYD, f.CA, f.WC)
+```
+
+``` {r table_tri_mallet, echo = F, results= 'asis'}
+kable(filter(tri, Year == "1982"), booktabs =T) %>% 
+  kable_styling(position = "center")
+```
+
+###Table S4- Frequencies for all three alleles, 2015 Collections
+
+``` {r table_tri_2015, echo = F}
+kable(filter(tri, Year == "2015"), booktabs =T) %>% 
+  kable_styling(position = "center")
+```
+
+\textbf{Tables S3-S4}- Maximum-likelihood estimates of the allele frequencies of the three \textit{Cr} alleles in the 1982 and 2015 samples.
+
+
+\pagebreak
+
+### Table S5- Parameter estimates for all tail models, 1982 cline
+
+```{r, coeftab1982, fig.align= "center"}
+load("results/mallet_allCLines.Rdata")
+
+comp1982 <- compare(none, left, right, mirror, ind)@output %>% 
+  dplyr::select(-SE, -dSE)
+
+coeftab(none, left, right, mirror, ind)@coefs %>% 
+  as.data.frame(.) %>% 
+  rownames_to_column(.) %>% 
+  filter(rowname %in% grep("\\[|_", .$rowname, invert = T, value = T)) %>% 
+  rename(parameter = rowname) %>% 
+  kable(., booktabs =T, linesep = "") %>% 
+  add_header_above(c(" " = 1, "Introgression tails" = 5), align = "c") %>% 
+  kable_styling(position = "center", font_size = 9)
+```
+
+### Table S6- Parameter estimates for all tail models, 1999 cline
+
+```{r, coeftab1999, fig.align= "center"}
+load("results/blum_allCLines.Rdata")
+
+comp1999 <- compare(none, left, right, mirror, ind)@output %>% 
+  dplyr::select(-SE, -dSE)
+
+coeftab(none, left, right, mirror, ind)@coefs %>% 
+  as.data.frame(.) %>% 
+  rownames_to_column(.) %>% 
+  filter(rowname %in% grep("\\[|_", .$rowname, invert = T, value = T)) %>% 
+  rename(parameter = rowname) %>% 
+  kable(., booktabs =T, linesep = "") %>% 
+  add_header_above(c(" " = 1, "Introgression tails" = 5), align = "c") %>% 
+  kable_styling(position = "center", font_size = 9)
+```
+
+### Table S7- Parameter estimates for all tail models, 2015 cline
+
+```{r, coeftab2015, fig.align= "center"}
+load("results/thurman_allCLines.Rdata")
+
+comp2015 <- compare(none, left, right, mirror, ind)@output %>% 
+  dplyr::select(-SE, -dSE)
+
+coeftab(none, left, right, mirror, ind)@coefs %>% 
+  as.data.frame(.) %>% 
+  rownames_to_column(.) %>% 
+  filter(rowname %in% grep("\\[|_", .$rowname, invert = T, value = T)) %>% 
+  rename(parameter = rowname) %>% 
+  kable(., booktabs =T, linesep = "") %>% 
+  add_header_above(c(" " = 1, "Introgression tails" = 5), align = "c") %>% 
+  kable_styling(position = "center", font_size = 9)
+```
+
+\textbf{Tables S5-S7}- Cline parameter estimates (posterior mean) for all five possible tail models (no introgression tails, left tail, right tail, mirrored tails, and independent tails) for each year. 
+
+\pagebreak
+
+### Table S8- Model comparison, 1982 cline
+
+```{r, modelcomp1982}
+
+comp1982 %>% 
+  kable(., booktabs = T, digits = 2) %>% 
+  kable_styling(position = "center")
+
+```
+
+### Table S9- Model comparison, 1999 cline
+
+```{r, modelcomp1999}
+
+comp1999 %>% 
+  kable(., booktabs = T, digits = 2) %>% 
+  kable_styling(position = "center")
+
+```
+
+### Table S10- Model comparison, 2015 cline
+
+```{r, modelcomp2015}
+
+comp2015 %>% 
+  kable(., booktabs = T, digits = 2) %>% 
+  kable_styling(position = "center")
+
+```
+
+\textbf{Tables S8-S10}- Table of WAIC comparisons and Akaike weights for the five possible tail models (no introgression tails, left tail, right tail, mirrored tails, and independent tails) for each year. pWAIC is the effective number of parameters, dWAIC is the difference in WAIC compared with the model with the lowest WAIC, and weight is the Akaike weight. 
+
+\pagebreak
+
+```{r}
+# Model checking: trace plots ---------------------------------------------
+
+# Visually examine the trace plots for the parameters we care about
+# Don't plot the traces of expected p, y_rep, deviance, and logliklihood
+load("results/mallet_bestCline.Rdata")
+mallet <- none
+rm(none)
+
+# Blum
+load("results/blum_bestCline.Rdata")
+blum <- right
+rm(right)
+
+# Thurman
+load("results/thurman_bestCline.Rdata")
+x.2015 <- right
+thurman <- right
+rm(right)
+
+plot_trace <- function(stanfit) { # Take in a stanfit model
+  # convert it to an array, which Bayesplot likes for plotting
+  post <- as.array(stanfit)
+  # extract the NUTS parameters for diagnosos
+  np <- nuts_params(stanfit) 
+  # Get the name of the stanfit model this is being done on
+  name <- str_to_title(str_replace(deparse(substitute(stanfit)), ".eff", ""))
+  # Use a high-contrast color scheme
+  color_scheme_set("viridis")
+  # Then plot the traces using mcmc_trace, all in one column
+  keep <- grep("\\[|_", names(stanfit), invert = T, value = T)
+  mcmc_trace(post, pars = keep, np = np,
+             facet_args = list(ncol = 1, strip.position = "left")) +
+    ggtitle("")
+}
+```
+
+\pagebreak
+
+### Figure S1- MCMC diagnostics, 1982 Cline
+```{r, fig.height=7, fig.width= 6}
+plot_trace(mallet)
+```
+
+\textbf{Figure S1}- Trace plots of the cline parameters for the best fit model (no tails) for the 1982 cline
+
+\pagebreak
+
+### Figure S2- MCMC diagnostics, 1999 Cline
+```{r, fig.height=7, fig.width= 6}
+plot_trace(blum)
+```
+
+\textbf{Figure S2}- Trace plots of the cline parameters for the best fit model (right tail) for the 1999 cline
+
+
+\pagebreak 
+
+### Figure S3- MCMC diagnostics, 2015 Cline
+```{r, fig.height=7, fig.width= 6}
+plot_trace(x.2015)
+```
+
+\textbf{Figure S3}- Trace plots of the cline parameters for the best fit model (right tail) for the 2015 cline
+
+\pagebreak
+
+### Figure S4- Inbreeding coefficients
+
+```{r prep mallet} 
+mallet.fis.est <- as.data.frame(mallet) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  summarise_all(.funs = mean) %>% 
+  t(.) %>% 
+  as.data.frame(.) %>% 
+  rename(est = V1)
+mallet.fis.bounds <- as.data.frame(mallet) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  as.mcmc(.) %>% 
+  HPDinterval(., prob = 0.95) %>% 
+  as.data.frame(.)
+mallet.fis <- data.frame(
+  year = 1982,
+  transectDist = filter(joint, year == 1982)$transect.dist,
+  site = filter(joint, year == 1982)$site.collected,
+  fis = mallet.fis.est,
+  low = mallet.fis.bounds$lower,
+  up = mallet.fis.bounds$upper
+)
+```
+
+```{r prep blum} 
+blum.fis.est <- as.data.frame(blum) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  summarise_all(.funs = mean) %>% 
+  t(.) %>% 
+  as.data.frame(.) %>% 
+  rename(est = V1)
+blum.fis.bounds <- as.data.frame(blum) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  as.mcmc(.) %>% 
+  HPDinterval(., prob = 0.95) %>% 
+  as.data.frame(.)
+blum.fis <- data.frame(
+  year = 1999,
+  transectDist = filter(joint, year == 1999)$transect.dist,
+  site = filter(joint, year == 1999)$site.collected,
+  fis = blum.fis.est,
+  low = blum.fis.bounds$lower,
+  up = blum.fis.bounds$upper
+)
+```
+
+```{r prep thurman} 
+thurman.fis.est <- as.data.frame(thurman) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  summarise_all(.funs = mean) %>% 
+  t(.) %>% 
+  as.data.frame(.) %>% 
+  rename(est = V1)
+thurman.fis.bounds <- as.data.frame(thurman) %>% 
+  dplyr::select(starts_with("f[")) %>% 
+  as.mcmc(.) %>% 
+  HPDinterval(., prob = 0.95) %>% 
+  as.data.frame(.)
+thurman.fis <- data.frame(
+  year = 2015,
+  transectDist = filter(joint, year == 2015)$transect.dist,
+  site = filter(joint, year == 2015)$site.collected,
+  fis = thurman.fis.est,
+  low = thurman.fis.bounds$lower,
+  up = thurman.fis.bounds$upper
+)
+```
+
+```{r plot fis}
+fis <- rbind(mallet.fis, blum.fis, thurman.fis, make.row.names = F) %>% 
+  as_tibble(.)
+
+ggplot(data = fis, aes(x = transectDist, y = est, ymin = low, ymax = up, color = as.factor(year))) +
+  geom_point() +
+  geom_linerange() +
+  facet_rep_grid(year ~ .) +
+  ylab("Inbreeding coefficient (Fis)") +
+  xlab("Distance along transect (km)") +
+  theme_default() +
+  theme(legend.position="none") 
+  
+```
+
+\textbf{Figure S4}- Estimates of of the inbreeding coefficient, $F_{IS}$, across the hybrid zone. Points and lines show the mean $\pm$ 95% HPDI of the posterior distribution of $F_{IS}$ for each site along the transect, as estimated from the best-fit cline model for each year. 
+
+
+\pagebreak
+
+### Figure S5- Posterior predictive check, 1982 cline
+```{r, prep_ppc}
+joint <- read.csv("processed_data/joint_transect.csv") %>% 
+  mutate(AA = A.melanized, Aa = B.hetero, aa = C.west.col + D.postman)
+postPred_intervals <- function(stanfit, raw.data.frame, prob) {
+  ppc_intervals <- as.data.frame(stanfit) %>%
+    dplyr::select(starts_with("y_rep")) %>%
+    as.mcmc(.) %>%
+    HPDinterval(., prob = prob) %>% 
+    as.data.frame(.) %>% 
+    mutate(param = row.names(.)) %>% 
+    separate(param, into = c("y", "rep", "site", "genotype")) %>% 
+    dplyr::select(site, genotype, ppc_low = lower, ppc_up = upper)
+  ppc_intervals$genotype[which(ppc_intervals$genotype == 1)] <- "AA"
+  ppc_intervals$genotype[which(ppc_intervals$genotype == 2)] <- "Aa"
+  ppc_intervals$genotype[which(ppc_intervals$genotype == 3)] <- "aa"
+
+  raw.data.frame %>% 
+    dplyr::select(transect.dist, AA, Aa, aa, site.collected) %>% 
+    dplyr::mutate(total = AA + Aa + aa,
+                  site = as.character(seq(from = 1, to = dim(.)[1], by = 1))) %>% 
+    gather(AA:aa, key = "genotype", value = "obs.count") %>% 
+    left_join(ppc_intervals, by = c("site", "genotype")) %>% 
+    mutate(inRange = ifelse(obs.count <= ppc_up & obs.count >= ppc_low, T, F))
+}
+
+mallet.ppc <- postPred_intervals(mallet, filter(joint, year == "1982"), .95)
+blum.ppc <- postPred_intervals(blum, filter(joint, year == "1999"), .95)
+thurman.ppc <- postPred_intervals(thurman, filter(joint, year == "2015"), .95)
+
+plot_ppc <- function(ppc_res, ...) {
+  cols <- c("FALSE" = "darkorange", "TRUE" = rgb(122,207,221, maxColorValue = 255))
+  ppc_res <- droplevels(ppc_res)
+  
+  ppc_res$site.collected <- factor(ppc_res$site.collected, levels = unique(ppc_res$site.collected))
+  ppc_res$genotype <- factor(ppc_res$genotype, levels = c("AA", "Aa", "aa"))
+  ppc_res %>% 
+    mutate(obs = obs.count/total,
+           ppc_low = ppc_low/total,
+           ppc_up = ppc_up/total) %>% 
+    ggplot(aes(x = site.collected, ymin = ppc_low, ymax = ppc_up, y = obs, color = inRange)) +
+    geom_linerange(position = position_dodge(width = 1)) +
+    geom_point() + 
+    scale_color_manual(values = cols) +
+    facet_rep_grid(genotype~.) +
+    theme_default() +
+    theme(legend.position="none",
+          axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.45)) + 
+    xlab("Site") +
+    ylab("Genotype frequency")
+}
+
+
+```
+
+```{r, fig.height= 6, fig.width = 6}
+plot_ppc(mallet.ppc)
+```
+
+\textbf{Figure S5}- Posterior predictive check of the best fit cline model (no tails) for the 1982 cline. Within each panel, vertical lines represent the 95% posterior predictive interval of the expected genotype frequency at that site, while points show the observed genotype frequency. Genotypes are represented separately in each panel (top = $AA$, middle = $Aa$, botom = $aa$). Sites colored in orange show an observed genotype frequency outside of the 95% posterior predictive interval. 
+
+
+\pagebreak
+
+### Figure S6- Posterior predictive check, 1999 cline
+
+```{r, fig.height= 6, fig.width = 6}
+plot_ppc(blum.ppc)
+```
+
+\textbf{Figure S6}- Posterior predictive check of the best fit cline model (right tail) for the 1999 cline. Within each panel, vertical lines represent the 95% posterior predictive interval of the expected genotype frequency at that site, while points show the observed genotype frequency. Genotypes are represented separately in each panel (top = $AA$, middle = $Aa$, botom = $aa$). Sites colored in orange show an observed genotype frequency outside of the 95% posterior predictive interval. 
+
+\pagebreak
+
+### Figure S7- Posterior predictive check, 2015 cline
+```{r, fig.height= 6, fig.width = 6}
+plot_ppc(thurman.ppc)
+```
+
+\textbf{Figure S7}- Posterior predictive check of the best fit cline model (right tail) for the 2015 cline. Within each panel, vertical lines represent the 95% posterior predictive interval of the expected genotype frequency at that site, while points show the observed genotype frequency. Genotypes are represented separately in each panel (top = $AA$, middle = $Aa$, botom = $aa$). Sites colored in orange show an observed genotype frequency outside of the 95% posterior predictive interval. 
+
+\pagebreak
+
+### Figure S8- Forest cover across the transect
+
+```{r, envData, fig.height= 7, fig.width = 6}
+gen <- read.csv("processed_data/generated_sites_along_transect.csv", stringsAsFactors = F)
+
+ndvi2000 <- raster("raw_data/forest_cover/panama_NDVI_2000_merged_clipped.tif")
+ndvi2017 <- raster("raw_data/forest_cover/panama_NDVI_2017_merged_clipped.tif")
+dNDVI <- raster("raw_data/forest_cover/panama_deltaNDVI_2000-2017.tif")
+lossyear <- raster("raw_data/forest_cover/panama_lossyear_2017_merged_clipped.tif")
+
+prop_lost <- function(vector, ...) {
+  1- (sum(vector == 0)/length(vector))
+}
+
+sites_gen<- SpatialPoints(cbind(gen$tran.Coord.W, gen$tran.Coord.N), 
+                                 proj4string = CRS(proj4string(ndvi2000)))
+# can look at the forest cover at our generated sites
+gen$ndvi2000 <- raster::extract(ndvi2000, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
+
+gen$ndvi2017  <- raster::extract(ndvi2017, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
+
+gen$dNDVI <- raster::extract(dNDVI, sites_gen, method = "simple", fun = mean, buffer = 5000, na.rm = T)
+
+gen$propLost<- raster::extract(lossyear, sites_gen, method = "simple", fun = prop_lost, buffer = 5000, na.rm = T)
+```
+
+``` {r, envFig, fig.height= 10, fig.width = 6.5}
+
+a <- gen %>% 
+  dplyr::select(transect.dist, propLost) %>% 
+  ggplot(aes(x = transect.dist, y = propLost)) +
+  geom_point(color = "purple") +
+  geom_smooth(method = "loess", color = "purple", se = F) +
+  geom_vline(aes(xintercept = 467), lty = "dotted") +
+  geom_vline(aes(xintercept = 451), lty = "dashed") +
+  xlab("") +
+  ylab("Proportion of forest lost\n2000-2017") +
+  theme_default() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 10))
+
+b <- gen %>% 
+  dplyr::select(transect.dist, ndvi2000) %>% 
+  ggplot(aes(x = transect.dist, y = ndvi2000)) +
+  geom_point(color = "olivedrab3") +
+  geom_smooth(method = "loess", color = "olivedrab3", se = F) +
+  geom_vline(aes(xintercept = 467), lty = "dotted") +
+  geom_vline(aes(xintercept = 451), lty = "dashed") +
+  xlab("") +
+  ylab("mean NDVI, 2000") +
+  theme_default() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 10)) 
+
+c <- gen %>% 
+  dplyr::select(transect.dist, ndvi2017) %>% 
+  ggplot(aes(x = transect.dist, y = ndvi2017)) +
+  geom_point(color = "olivedrab4") +
+  geom_smooth(method = "loess", color = "olivedrab4", se = F) +
+  geom_vline(aes(xintercept = 467), lty = "dotted") +
+  geom_vline(aes(xintercept = 451), lty = "dashed") +
+  xlab("") +
+  ylab("mean NDVI, 2017") +
+  theme_default() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 10))
+
+d <- gen %>% 
+  dplyr::select(transect.dist, dNDVI) %>% 
+  ggplot(aes(x = transect.dist, y = dNDVI)) +
+  geom_point(color = "darkgreen") +
+  geom_smooth(method = "loess", color = "darkgreen", se = F) +
+  geom_vline(aes(xintercept = 467), lty = "dotted") +
+  geom_vline(aes(xintercept = 451), lty = "dashed") +
+  xlab("Distance along transect (km)") +
+  ylab(expression("mean"*Delta*"NDVI, 2000-2017")) +
+  theme_default() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 10))
+plot_grid(a, b, c, d, labels = c("A", "B", "C", "D"), align = "hv", rel_heights = c(1,1,1,1), nrow = 4, ncol = 1, axis = "tblr")
+```
+
+\textbf{Figure S8}- Variation in forest loss, NDVI, and change in NDVI across Panamá. For all panels, each point represents one of 47 circles of radius 5km at 15km intervals along our transect. Y-axes display measurements of forest dynamics within each circle: (A) proportion of forest loss, (B) mean NDVI in 2000, (C) mean NDVI in 2017, (D) mean difference in NDVI from 2000 to 2017. Each panel includes a loess-smoothed line to visualize trends. The vertical lines show the estimated center of the hybrid zone in 2000 (dotted) and 2015 (dashed).  
