@@ -22,3 +22,9 @@ results/mallet_allClines\.Rdata
 results/thurman_allClines\.Rdata
 
 *.tif
+
+manuscript/supplemental_files/
+
+manuscript/supplemental_cache/
+
+manuscript/manuscript_cache/
