@@ -115,11 +115,11 @@ Timothy J. Thurman^1,2^*, Andre Szejner-Sigal^1,3^, W. Owen McMillan^1^
 
 ^1^ Smithsonian Tropical Research Institute. Panamá, República de Panamá 
 
-^2^ Redpath Museum and Department of Biology, McGill University. Montreal, QC. Canada
+^2^ Redpath Museum and Department of Biology, McGill University. Montréal, QC. Canada
 
 ^3^ Department of Integrative Biology, University of California, Berkeley. Berkeley, CA. USA
 
-\* Corresponding author: \href{mailto:timothy.thurman@mail.mcgill.ca}{timothy.thurman@mail.mcgill.ca}. 859 Sherbrooke St. West. Montreal, QC. H3A 0C4. Canada. Tel: 514-398-4861. Fax : 514-398-3185.
+\* Corresponding author: \href{mailto:timothy.thurman@mail.mcgill.ca}{timothy.thurman@mail.mcgill.ca}. 859 Sherbrooke St. West. Montréal, QC. H3A 0C4. Canada. Tel: 514-398-4861. Fax : 514-398-3185.
 
 ### Author Contributions: 
 
@@ -131,7 +131,7 @@ We thank the members of the McMillan and Jiggins labs who helped catch butterfli
 
 ### Data Accessibility Statement:
 
-All data needed to replicate the analyses in this paper are either publicly available or contained in the supplementary material. All code for this paper will be made publicly available on GitHub upon acceptance. 
+All data needed to replicate the analyses in this paper are either publicly available, contained in the supplementary material, and/or deposited on Dryad (doi:10.5061/dryad.c157v0v). All R and Stan code needed to replicate the analyses and generate the manuscript and supplemental material is available on GitHub (GitHub/Zenodo DOI TO COME). 
 
 \pagebreak
 \pagenumbering{arabic} 
@@ -172,7 +172,7 @@ Three forms of \textit{Heliconius erato} with similar color patterns can be foun
 
 ### Sample collection
 
-We extracted collection data from \citet{Mallet:1986vj} and \citet{Blum:2002wr} so that we could re-estimate the previous clines under a common framework. We included  $`r dim(data.mallet)[1]`$ of Mallet's sites and $`r dim(data.blum)[1]`$ of Blum's sites in our analysis (see supplemental methods). For our collections, we sampled \textit{H. erato} from June to November of 2015 at $`r dim(data.thurman)[2]`$ sites along a transect running from west to east across Panamá (Figure 1, Table S1). When possible, we collected butterflies at the same GPS coordinates as \citet{Mallet:1986vj} and \citet{Blum:2002wr}. We captured butterflies with aerial nets.
+We extracted collection data from \citet{Mallet:1986vj} and \citet{Blum:2002wr} so that we could re-estimate the previous clines under a common framework. We included  $`r dim(data.mallet)[1]`$ of Mallet's sites and $`r dim(data.blum)[1]`$ of Blum's sites in our analysis (see supplemental methods). For our collections, we sampled \textit{H. erato} from June to November of 2015 at $`r dim(data.thurman)[1]`$ sites along a transect running from west to east across Panamá (Figure 1, Table S1). When possible, we collected butterflies at the same GPS coordinates as \citet{Mallet:1986vj} and \citet{Blum:2002wr}. We captured butterflies with aerial nets.
 
 ### Phenotyping and Genotyping
 
@@ -250,7 +250,7 @@ In total, we analyzed `r sum(joint$N)` butterflies ($N_{1982}$ = `r sum(data.mal
 
 ### Cline results
 
-Our estimates of the cline parameters for the 1982 and 1999 clines are consistent with the maximum-likelihood estimates of the same clines from \citet{Blum:2002wr}, further confirming the suitability of our model (Table 1). The numeric values for cline center are not directly comparable across these studies, as \citeauthor{Blum:2002wr} measured all cline distances in relation to Panama City, while we measured distances in relation to the westernmost sampling site. However, the cline centers we find for 1982 (516 km along the transect, just west of Cañazas) and 1999-2000 (467 km along the transect, on the eastern edge of Lake Bayano) are the same as those estimated by \citet{Blum:2002wr}. Similarly, our estimates of cline width for 1982 (53km, 95% CI 35-71) and 1999-200 (60km, 95% CI 36-85) are similar to Blum's estimates (66km and 58km, respectively) (Table 1). 
+Our estimates of the cline parameters for the 1982 and 1999 clines are consistent with the maximum-likelihood estimates of the same clines from \citet{Blum:2002wr}, further confirming the suitability of our model (Table 1). The numeric values for cline center are not directly comparable across these studies, as \citeauthor{Blum:2002wr} measured all cline distances in relation to Panama City, while we measured distances in relation to the westernmost sampling site. However, the cline centers we find for 1982 (516 km along the transect, just west of Cañazas) and 1999-2000 (467 km along the transect, on the eastern edge of Lake Bayano) are the same as those estimated by \citet{Blum:2002wr}. Similarly, our estimates of cline width for 1982 (53km, 95% CI 35-71) and 1999-2000 (60km, 95% CI 36-85) are similar to Blum's estimates (66km and 58km, respectively) (Table 1). 
 
 From our sampling in 2015, we find that the hybrid zone has continued to move west (Figure 2). The cline center is now 451km (95% CI 442-460) from the start of the transect, near the western edge of Lake Bayano. This change in position is statistically significant, though the rate of cline movement has slowed. While the cline moved 48km (95% CI 41-56) from 1982-1999 (~2.8 km/year), it has moved only 16km (95% CI 5-27) from 1999-2015 (~1 km/year).
 
@@ -306,13 +306,13 @@ Although individual studies of hybrid zones are certainly useful, our work shows
 
 ## Figures and Tables
 
-\textbf{Figure 1}- Sampling of \textit{Heliconius erato} across Panamá. Collection sites from 2015 are shown in yellow, while the sites from \citet{Mallet:1986vj} and \citet{Blum:2002wr} are shown as grey triangles and squares, respectively. The pie charts show the proportion of each phenotype caught at each site in 2015, with colors matching the cartoon representations of the four phenotypic classes of  \textit{H. erato} in our study. Dorsal pattern is shown on the left with ventral pattern on the right. The dashed line shows the fitted cubic transect used for calculating distances. 
+\textbf{Figure 1}- Sampling of \textit{Heliconius erato} across Panamá. Collection sites from 2015 are shown in yellow, while the sites from \citet{Mallet:1986vj} and \citet{Blum:2002wr} are shown as grey triangles and squares, respectively. The pie charts show the proportion of each phenotype sampled at each site in 2015, with colors matching the cartoon representations of the four phenotypic classes of  \textit{H. erato} in our study. Dorsal pattern is shown on the left with ventral pattern on the right. The dashed line shows the fitted cubic transect used for calculating distances. 
 
 \textbf{Figure 2}- Results of cline analysis. The solid orange line shows the best-fit cline for 2015, while the transparent grey lines show the full posterior distribution of the best-fit cline model for 2015: each grey line is a cline where the values for each parameter are the values from one sample of the posterior distribution. The dotted and dashed lines show the estimated best-fit clines for 1982 and 1999-2000, respectively. The points and vertical lines are not derived from the cline model, and instead show the per-site frequency (with 95% credible intervals) of the \textit{Cr\textsubscript{HYD}} allele at each site along the transect in 2015, as estimated directly from the sampling data. 
 
 \textbf{Figure 3}- The relationship between change in \textit{Cr\textsubscript{HYD}} allele frequency and (A) proportion of forest lost from 2000 to 2017, and (B) mean $\Delta$NDVI from 2000 to 2017. Each data point represents one circle of radius 5km spaced at 15km intervals along our transect. Inset in each panel are the correlation coefficient (Spearman's $\rho$) and $P$-value of a test for correlation between the two variables. 
 
-\textbf{Table 1}- Parameter estimates for the best-fit cline model for each year. Estimates are given as the posterior mean, and 95\% credible intervals are the 95\% highest posterior density interval of the marginal distribution for each parameter. Parameters: \textit{center} is the location (in km along the transect) of the cline center, where the frequency of the \textit{Cr\textsubscript{HYD}} allele is 0.5; \textit{width} is the width of the cline (in km) such that $1/width$ is the maximal slope of the cline;  $p_{min}$ and $p_{max}$ are the minimum and maximum frequencies of the \textit{Cr\textsubscript{HYD}} allele in the cline tails, $\delta_{R}$ is the distance from the cline center at which the right introgression tail starts, and $\tau_{R}$ is the ratio of the slope of the introgression tail to the slope of the sigmoid center. The best-fit cline from 1982 was a model without introgression tails, so it does not have $\delta_{R}$ and $\tau_{R}$ parameters.
+\textbf{Table 1}- Parameter estimates for the best-fit cline model for each year. Estimates are given as the posterior mean, and 95\% credible intervals are the 95\% highest posterior density interval of the marginal distribution for each parameter. Parameters: \textit{center} is the location (in km along the transect) of the cline center; \textit{width} is the width of the cline (in km) such that $1/width$ is the maximal slope of the cline;  $p_{min}$ and $p_{max}$ are the minimum and maximum frequencies of the \textit{Cr\textsubscript{HYD}} allele in the cline tails, $\delta_{R}$ is the distance from the cline center at which the right introgression tail starts, and $\tau_{R}$ is the ratio of the slope of the introgression tail to the slope of the sigmoid center. The best-fit cline from 1982 was a model without introgression tails, so it does not have $\delta_{R}$ and $\tau_{R}$ parameters.
 
 
 \pagebreak

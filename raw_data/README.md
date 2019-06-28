@@ -16,4 +16,4 @@ The `mallet_1986` folder contains the raw butterfly collection data taken from t
 
 Mallet, J. 1986. Hybrid zones of Heliconius butterflies in Panama and the stability and movement of warning colour clines. Heredity 56:191–202.
 
-The `forest cover` folder is empty. It should contain the `.tif` files containing the data on NDVI, deltaNDVI, and forest cover loss, but they are too large (1.6 Gb) to host on GitHub. See the supplemental material for information on where to download the forest cover data and information on the processing steps we took to generate the files we analyzed. 
+The `forest cover` folder is empty. It should contain the `.tif` files containing the data on NDVI, deltaNDVI, and forest cover loss, but they are too large (1.6 Gb) to host on GitHub. The files can be obtained from the Dryad digital repository for this paper (doi:10.5061/dryad.c157v0v). See the supplemental material for information on where to download the forest cover data and information on the processing steps we took to generate the files we analyzed. 
